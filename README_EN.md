@@ -8,7 +8,7 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 
 ## Demo
 
-![paperagent-ezgif](asset\paperagent-ezgif.gif)
+![paperagent-ezgif](asset/paperagent-ezgif.gif)
 
 ## Features
 

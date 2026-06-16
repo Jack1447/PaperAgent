@@ -8,7 +8,7 @@
 
 ## Demo
 
-![paperagent-ezgif](asset\paperagent-ezgif.gif)
+![paperagent-ezgif](asset/paperagent-ezgif.gif)
 
 ## 功能
 
