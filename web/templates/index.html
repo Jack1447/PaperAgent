@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PaperAgent</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=22">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+</head>
+<body>
+
+    <!-- ===== SEARCH VIEW ===== -->
+    <div class="view active" id="view-search">
+        <!-- Collapsible sidebar -->
+        <aside class="search-sidebar" id="search-sidebar">
+            <div class="search-sidebar-header">
+                <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" title="收起侧边栏">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                </button>
+            </div>
+            <button class="sidebar-new-search" id="sidebar-new-search">
+                <span class="sidebar-btn-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg></span>
+                <span class="sidebar-btn-label">新检索</span>
+            </button>
+            <div class="search-sidebar-history" id="search-sidebar-history">
+                <div class="sidebar-section-title">历史记录</div>
+                <div class="sidebar-history-list" id="sidebar-history-list"></div>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <div class="search-main">
+            <div class="search-main-inner">
+            <header class="header">
+                <svg class="logo" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1a2332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                <h1>PaperAgent</h1>
+            </header>
+
+            <section class="search-section">
+                <div class="search-row">
+                    <input type="text" id="search-input" placeholder="输入研究主题，如：attention mechanism" autocomplete="off">
+                    <input type="number" id="max-results" value="15" min="1" max="20" title="检索论文数量">
+                    <div class="add-arxiv-wrapper">
+                        <button class="btn" id="arxiv-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            arXiv
+                        </button>
+                        <div class="add-arxiv-popover" id="arxiv-popover">
+                            <input type="text" id="arxiv-input" placeholder="arXiv 链接或 ID，如 1706.03762">
+                            <button class="btn btn-primary" id="arxiv-add-btn" style="width:100%;justify-content:center">添加论文</button>
+                        </div>
+                    </div>
+                </div>
+                <div id="search-status"></div>
+                <div id="loading-inline"></div>
+            </section>
+
+            <div class="stats" id="stats" style="display:none">
+                <span class="stat-value" id="stat-papers">0</span><span class="stat-label">篇论文</span>
+            </div>
+
+            <div id="subtopics-container"></div>
+            <div id="paper-list"></div>
+
+            <div class="empty-state" id="empty-state">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#d0d5dd" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                <p>输入研究主题并回车开始检索</p>
+            </div>
+            </div><!-- /search-main-inner -->
+        </div>
+    </div>
+
+    <!-- ===== DETAIL VIEW ===== -->
+    <div class="view" id="view-detail">
+        <div class="detail-topbar" id="detail-topbar">
+            <div class="detail-topbar-content">
+                <h2 class="detail-title" id="detail-title"></h2>
+                <div class="detail-meta" id="detail-meta"></div>
+            </div>
+            <div class="detail-upload-wrap" id="detail-upload-wrap">
+                <button class="btn btn-sm btn-upload" id="btn-upload-pdf" title="上传本地PDF">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                    上传PDF
+                </button>
+                <span class="upload-status" id="upload-status"></span>
+            </div>
+        </div>
+        <input type="file" id="upload-file-input" accept=".pdf" style="display:none">
+
+        <div class="detail-body">
+            <nav class="detail-sidebar" id="detail-sidebar">
+                <button class="sidebar-btn sidebar-btn-back" id="back-btn">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></polyline></svg>
+                    返回
+                </button>
+                <div class="sidebar-divider"></div>
+                <button class="sidebar-btn" data-panel="abstract">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    摘要
+                </button>
+                <button class="sidebar-btn active" data-panel="summary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h7"/></svg>
+                    总结
+                </button>
+                <button class="sidebar-btn" data-panel="review">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                    审阅
+                </button>
+                <button class="sidebar-btn" data-panel="chat">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    聊天
+                </button>
+                <div class="sidebar-divider"></div>
+                <button class="sidebar-btn" data-panel="pdf">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    PDF
+                </button>
+            </nav>
+
+            <main class="detail-main">
+                <div class="panel" id="panel-abstract"></div>
+                <div class="panel" id="panel-summary">
+                    <div class="panel-loading" id="summary-loading"><div class="spinner"></div><span>正在生成总结...</span></div>
+                </div>
+                <div class="panel" id="panel-review" style="display:none">
+                    <div class="panel-loading" id="review-loading"><div class="spinner"></div><span>正在生成审阅...</span></div>
+                </div>
+                <div class="panel panel-chat" id="panel-chat" style="display:none">
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-input-row">
+                        <input type="text" id="chat-input" placeholder="基于论文内容提问..." autocomplete="off">
+                        <button class="btn btn-primary btn-send" id="chat-send-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></polygon></svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="panel panel-pdf" id="panel-pdf" style="display:none">
+                    <div class="pdf-placeholder" id="pdf-placeholder"></div>
+                    <iframe class="pdf-frame" id="pdf-frame" style="display:none"></iframe>
+                </div>
+            </main>
+
+            <!-- Right column: Notes / Translate tabs -->
+            <aside class="detail-notes" id="detail-notes">
+                <div class="detail-notes-header">
+                    <div class="notes-tabs">
+                        <button class="notes-tab active" data-ntab="notes">笔记</button>
+                        <button class="notes-tab" data-ntab="translate">翻译</button>
+                    </div>
+                    <button class="notes-preview-toggle" id="notes-preview-toggle" title="预览 Markdown">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    </button>
+                    <span class="notes-saved-inline" id="notes-saved-inline">已保存</span>
+                </div>
+                <!-- Notes view -->
+                <div class="notes-content" id="notes-content">
+                    <textarea class="notes-editor" id="notes-editor" placeholder="Markdown 笔记..."></textarea>
+                    <div class="notes-preview" id="notes-preview" style="display:none"></div>
+                </div>
+                <!-- Translate view -->
+                <div class="translate-content" id="translate-content" style="display:none">
+                    <textarea class="translate-input" id="translate-input" placeholder="粘贴需要翻译的文字..."></textarea>
+                    <div class="translate-actions">
+                        <button class="btn-translate" id="btn-translate">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 8l6 6M13 8l-6 6M5 12h14"/><circle cx="12" cy="12" r="10"/></svg>
+                            翻译
+                        </button>
+                        <button class="btn-translate-copy" id="btn-translate-copy" title="复制翻译结果">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                            复制
+                        </button>
+                    </div>
+                    <div class="translate-result" id="translate-result"></div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script src="/static/js/app.js?v=21"></script>
+</body>
+</html>

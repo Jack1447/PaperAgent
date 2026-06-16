@@ -1,0 +1,36 @@
+# ========== 多智能体编排 ==========
+langgraph>=0.2.0
+langgraph-checkpoint-sqlite>=2.0.0
+
+# ========== LLM 集成 ==========
+litellm>=1.50.0
+
+# ========== 工具链 ==========
+langchain>=0.3.0
+langchain-community>=0.3.0
+langchain-text-splitters>=0.3.0
+
+# ========== 向量数据库 ==========
+chromadb>=0.5.0
+
+# ========== Web 界面 ==========
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0
+jinja2>=3.1.0
+python-multipart>=0.0.12
+
+# ========== PDF 解析 ==========
+pymupdf>=1.24.0
+
+# ========== 配置管理 ==========
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# ========== 重试机制 ==========
+tenacity>=9.0.0
+
+# ========== 网络请求 ==========
+requests>=2.31.0
+
+# ========== arXiv 数据源 (可选，也可用 requests 直接调 API) ==========
+arxiv>=2.1.0

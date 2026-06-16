@@ -1,0 +1,19 @@
+# ========== arXiv 搜索配置 ==========
+arxiv:
+  max_results_per_keyword: 8
+  sort_by: "relevance"
+  rate_limit_seconds: 3
+
+# ========== SerpAPI Scholar 搜索配置 (通过 302.ai) ==========
+scholar:
+  max_results_per_keyword: 10
+  rate_limit_seconds: 2
+  base_url: "https://api.302.ai/serpapi/search"
+
+# ========== 结果处理 ==========
+max_final_papers: 15
+
+# ========== Reflection 质量阈值 ==========
+min_relevant_papers: 5
+max_plan_retries: 2
+max_search_retries: 3
