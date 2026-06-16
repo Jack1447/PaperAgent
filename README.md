@@ -4,6 +4,8 @@
 
 **仅为简单实现，效果较差，仅供参考。**
 
+[English](README_EN.md)
+
 ## 功能
 
 - **智能检索**：输入研究主题，LLM 自动拆解为子方向，并发搜索 arXiv + Google Scholar
