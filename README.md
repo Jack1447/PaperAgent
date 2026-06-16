@@ -6,6 +6,8 @@
 
 [English](README_EN.md)
 
+demo: asset\demo.mp4
+
 ## 功能
 
 - **智能检索**：输入研究主题，LLM 自动拆解为子方向，并发搜索 arXiv + Google Scholar

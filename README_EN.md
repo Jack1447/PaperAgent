@@ -6,6 +6,8 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 
 [中文文档](README.md)
 
+demo: asset\demo.mp4
+
 ## Features
 
 - **Intelligent Retrieval**: LLM decomposes research topics into sub-directions, concurrently searches arXiv + Google Scholar
