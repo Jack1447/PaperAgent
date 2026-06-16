@@ -8,7 +8,7 @@
 
 ## Demo
 
-![paperagent-ezgif](asset/paperagent-ezgif.gif)
+![paperagent-ezgif](asset/paperagent_gif.gif)
 
 ## 功能
 
@@ -93,9 +93,10 @@ python app.py
 
 1. 输入研究主题（如 "Retrieval-Augmented Generation for scientific literature review"）
 2. 系统自动拆分主题并检索论文，论文卡片实时出现
-3. 勾选感兴趣的论文，点击「生成摘要」获取结构化中文摘要
+3. 勾选感兴趣的论文，点击「总结」获取结构化中文总结
 4. 点击「评审」获取 LLM 对论文的多维度评价
 5. 在论文对话框自由提问，进行深度阅读
+6. 支持笔记与翻译
 
 ## 项目结构
 
@@ -137,14 +138,3 @@ PaperAgent/
 └── tests/                 # 单元测试
 ```
 
-## 检索原理
-
-1. **Planner Agent** 用 LLM 将用户主题拆为 3-5 个子方向，每个方向生成 2-3 个英文关键词
-2. **LiteratureRetrieval** 轮询 arXiv API + Google Scholar（可选），按关键词搜索
-3. 以 arXiv ID 或规范标题去重，跨源合并同一论文的信息
-4. 综合评分：来源权重 + 关键词匹配 + 引用量 + 时效性 + 元数据完整性
-5. 排序后返回 Top N 篇（默认 15 篇）
-
-## License
-
-MIT

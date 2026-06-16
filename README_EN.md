@@ -8,7 +8,7 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 
 ## Demo
 
-![paperagent-ezgif](asset/paperagent-ezgif.gif)
+![paperagent-ezgif](asset/paperagent_gif.gif)
 
 ## Features
 
@@ -96,6 +96,7 @@ Open `http://127.0.0.1:8000` in your browser.
 3. Select papers of interest, click "Generate Summary" for structured summaries
 4. Click "Review" for LLM-based multi-dimensional evaluation
 5. Ask free-form questions in the paper dialog for deep reading
+6. Support notes and translation
 
 ## Project Structure
 
@@ -137,14 +138,3 @@ PaperAgent/
 └── tests/                 # Unit tests
 ```
 
-## Retrieval Pipeline
-
-1. **Planner Agent** uses LLM to break the user's topic into 3-5 sub-directions, each with 2-3 English keywords
-2. **LiteratureRetrieval** iterates arXiv API + Google Scholar (optional), searching by each keyword
-3. Deduplicates by arXiv ID or normalized title, merges information for the same paper across sources
-4. Composite scoring: source weight + keyword match + citations + freshness + metadata completeness
-5. Returns Top N papers sorted by score (default: 15)
-
-## License
-
-MIT
