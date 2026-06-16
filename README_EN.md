@@ -6,7 +6,9 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 
 [中文文档](README.md)
 
-demo: asset\demo.mp4
+## Demo
+
+![paperagent-ezgif](asset\paperagent-ezgif.gif)
 
 ## Features
 

@@ -6,7 +6,9 @@
 
 [English](README_EN.md)
 
-demo: asset\demo.mp4
+## Demo
+
+![paperagent-ezgif](asset\paperagent-ezgif.gif)
 
 ## 功能
 
