@@ -30,3 +30,7 @@ DESIGN.md
 tests/*
 runtime_test_dir/*
 .pytest_cache/*
+
+experiment.py
+
+report/*

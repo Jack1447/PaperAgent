@@ -61,7 +61,7 @@ class ArxivClient:
         max_results: Optional[int] = None,
     ) -> list[Paper]:
         """
-        搜索 arXiv 论文
+        搜索 arXiv 论文（多策略：先标题精准匹配，再全字段回退）
 
         Args:
             query: 搜索关键词（英文）
@@ -72,8 +72,23 @@ class ArxivClient:
         """
         max_results = max_results or self.max_results
 
+        # 策略1: 标题搜索 (ti:) — 更精准，优先使用
+        papers = self._do_search(f"ti:{query}", max_results)
+        # 策略2: 如果标题搜索不足，回退到全字段搜索 (all:)
+        if len(papers) < max(max_results // 2, 3):
+            fallback = self._do_search(f"all:{query}", max_results)
+            existing_ids = {p.arxiv_id for p in papers}
+            for p in fallback:
+                if p.arxiv_id not in existing_ids:
+                    papers.append(p)
+                    existing_ids.add(p.arxiv_id)
+                    if len(papers) >= max_results:
+                        break
+        return papers
+
+    def _do_search(self, search_query: str, max_results: int) -> list[Paper]:
         params = {
-            "search_query": f"all:{query}",
+            "search_query": search_query,
             "start": 0,
             "max_results": max_results,
             "sortBy": self.sort_by,
@@ -141,34 +156,49 @@ class ArxivClient:
         )
 
     def find_by_title(self, title: str) -> Optional[Paper]:
-        """根据论文标题查找 arXiv 版本，逐步放宽匹配条件"""
+        """根据论文标题查找 arXiv 版本，多策略逐步放宽匹配条件。
+
+        核心改进：使用 ti:word1+AND+word2 组合词搜索代替 ti:"phrase" 严格短语搜索，
+        避免因标题中个别词差异（大小写、标点、多余内容）导致整条匹配失败。
+        """
         if not title or not title.strip():
             return None
 
         # Clean: remove punctuation, collapse whitespace
         clean_full = re.sub(r"[^a-zA-Z0-9\s]", " ", title)
         clean_full = re.sub(r"\s+", " ", clean_full).strip()[:300]
-        # Also try with just first 8 significant words (handle subtitle diffs)
-        words = [w for w in clean_full.split() if len(w) > 1]
-        clean_short = " ".join(words[:10]) if len(words) > 10 else clean_full
+        # Significant words (skip short stopwords like "a", "an", "to", "of", "in", "on", "is")
+        skip_words = {"a", "an", "the", "to", "of", "in", "on", "is", "at", "by", "for", "and", "or", "with", "from"}
+        sig_words = [w for w in clean_full.split() if len(w) > 2 or w.lower() not in skip_words]
+        if not sig_words:
+            sig_words = [w for w in clean_full.split() if len(w) > 1]
 
-        # Multiple query strategies, from strict to loose
+        # Build AND-based queries (much more robust than quoted phrase search)
+        and_all = "+AND+".join(sig_words[:12])
+        and_8 = "+AND+".join(sig_words[:8])
+        and_5 = "+AND+".join(sig_words[:5])
+        phrase_short = " ".join(sig_words[:8])
+
         queries = [
-            # Strategy 1: title field, full cleaned title
-            f'ti:"{clean_full}"',
-            # Strategy 2: title field, short (first N words)
-            f'ti:"{clean_short}"',
-            # Strategy 3: all fields, full cleaned
-            f'all:"{clean_full}"',
-            # Strategy 4: all fields, short + year hint
-            f'all:"{clean_short}"',
+            # Strategy 1: ti with AND of up to 12 significant words (most precise)
+            f"ti:{and_all}",
+            # Strategy 2: ti with AND of first 8 words
+            f"ti:{and_8}",
+            # Strategy 3: all fields, AND of up to 12 words
+            f"all:{and_all}",
+            # Strategy 4: all fields, AND of first 8 words
+            f"all:{and_8}",
+            # Strategy 5: all fields, AND of first 5 words (loose)
+            f"all:{and_5}",
+            # Strategy 6: all fields, short phrase (last resort)
+            f'all:"{phrase_short}"',
         ]
 
-        for query in queries:
+        for i, query in enumerate(queries):
             params = {
                 "search_query": query,
                 "start": 0,
-                "max_results": 3,
+                "max_results": 5,
                 "sortBy": "relevance",
                 "sortOrder": "descending",
             }
@@ -178,12 +208,16 @@ class ArxivClient:
                 resp.raise_for_status()
                 papers = self._parse_response(resp.text)
                 if papers:
-                    # Simple title similarity check (case-insensitive token overlap)
                     best = self._best_title_match(title, papers)
                     if best:
                         return best
-            except Exception:
-                continue  # try next strategy
+            except requests.RequestException as e:
+                status = getattr(getattr(e, "response", None), "status_code", None)
+                if status:
+                    print(f"[ArxivClient] find_by_title strat {i+1} HTTP {status}: {e}")
+                else:
+                    print(f"[ArxivClient] find_by_title strat {i+1}: {e}")
+                continue
 
         return None
 

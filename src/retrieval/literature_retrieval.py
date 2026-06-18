@@ -1,7 +1,8 @@
 """Literature retrieval module.
 
-This module owns source adapters, normalization, deduplication, and ranking.
-SearchAgent delegates retrieval here.
+Search flow: Scholar (primary) → arXiv reverse lookup (enrichment) → dedup → score → rank.
+ArXiv is no longer used as a direct search source; it only serves as an enrichment
+step via title-based reverse lookup for papers found on Scholar.
 """
 from __future__ import annotations
 
@@ -25,35 +26,19 @@ class RetrievalQuery:
     keyword: str
 
 
-class ArxivSource:
-    name = "arxiv"
-
-    def __init__(self):
-        from src.tools.arxiv_client import ArxivClient
-        self.client = ArxivClient()
-
-    def search(self, query: str) -> list[Any]:
-        return self.client.search(query)
-
-
 class ScholarSource:
     name = "scholar"
 
-    def __init__(self, api_key: str = "", base_url: str = "", arxiv_client=None):
+    def __init__(self, api_key: str = "", base_url: str = ""):
         from src.tools.scholar import ScholarClient
-        self.client = ScholarClient(api_key=api_key, base_url=base_url, arxiv_client=arxiv_client)
+        self.client = ScholarClient(api_key=api_key, base_url=base_url)
 
     def search(self, query: str) -> list[Any]:
         return self.client.search(query)
 
 
 class LiteratureRetrieval:
-    """Retrieve and rank papers across literature sources."""
-
-    SOURCE_WEIGHTS = {
-        "arxiv": 2.0,
-        "scholar": 1.6,
-    }
+    """Retrieve papers via Scholar, enrich with arXiv reverse lookup, rank."""
 
     def __init__(
         self,
@@ -63,13 +48,16 @@ class LiteratureRetrieval:
         self.config = get_search_config()
         self.sources = sources if sources is not None else self._default_sources()
         self.max_papers = max_papers or self.config.get("max_final_papers", 15)
+        self._arxiv_client = self._init_arxiv_client()
+
+    # ── Public API ──
 
     def retrieve_stream(
         self,
         subtopics: list[dict[str, Any]],
         fallback_query: str = "",
     ):
-        """Generator that yields papers one by one as they are retrieved."""
+        """Generator that yields papers one by one, with arXiv reverse lookup."""
         queries = self._build_queries(subtopics, fallback_query)
         by_key: dict[str, Any] = {}
         count = 0
@@ -86,15 +74,19 @@ class LiteratureRetrieval:
                     self._annotate_paper(paper, source.name, query)
                     key = self._dedupe_key(paper)
                     existing = by_key.get(key)
-                    if existing is None:
-                        by_key[key] = paper
-                        score, reasons = self._score_paper(paper)
-                        setattr(paper, "retrieval_score", score)
-                        setattr(paper, "retrieval_reasons", reasons)
-                        count += 1
-                        yield paper
-                    else:
+                    if existing is not None:
                         by_key[key] = self._merge_paper(existing, paper)
+                        continue
+
+                    # ---- arXiv reverse lookup (only if no arXiv ID yet) ----
+                    self._reverse_lookup_arxiv(paper)
+
+                    by_key[key] = paper
+                    score, reasons = self._score_paper(paper)
+                    setattr(paper, "retrieval_score", score)
+                    setattr(paper, "retrieval_reasons", reasons)
+                    count += 1
+                    yield paper
 
     def retrieve(
         self,
@@ -104,6 +96,7 @@ class LiteratureRetrieval:
         queries = self._build_queries(subtopics, fallback_query)
         by_key: dict[str, Any] = {}
 
+        # Step 1: Scholar search per keyword
         for query in queries:
             for source in self.sources:
                 for paper in source.search(query.keyword):
@@ -115,6 +108,11 @@ class LiteratureRetrieval:
                     else:
                         by_key[key] = self._merge_paper(existing, paper)
 
+        # Step 2: arXiv reverse lookup for all papers without arXiv ID
+        for paper in by_key.values():
+            self._reverse_lookup_arxiv(paper)
+
+        # Step 3: Score & rank
         papers = list(by_key.values())
         for paper in papers:
             score, reasons = self._score_paper(paper)
@@ -123,17 +121,55 @@ class LiteratureRetrieval:
         papers.sort(key=self._rank_key, reverse=True)
         return papers[: self.max_papers]
 
-    def _default_sources(self) -> list[PaperSource]:
-        sources: list[PaperSource] = []
-        arxiv = ArxivSource()
-        sources.append(arxiv)
+    # ── Source init ──
 
+    def _init_arxiv_client(self):
+        """Lazily create ArxivClient for reverse lookup only."""
+        from src.tools.arxiv_client import ArxivClient
+        return ArxivClient()
+
+    def _default_sources(self) -> list[PaperSource]:
+        """Scholar is the only primary search source."""
         scholar_key = os.getenv("SCHOLAR_API_KEY", "")
         scholar_url = os.getenv("SCHOLAR_BASE_URL", "")
-        if scholar_key:
-            sources.append(ScholarSource(api_key=scholar_key, base_url=scholar_url, arxiv_client=arxiv.client))
+        if not scholar_key:
+            print("[LiteratureRetrieval] WARNING: SCHOLAR_API_KEY not set, search will produce no results.")
+        return [
+            ScholarSource(api_key=scholar_key, base_url=scholar_url),
+        ]
 
-        return sources
+    # ── arXiv reverse lookup ──
+
+    def _reverse_lookup_arxiv(self, paper: Any) -> None:
+        """Try to find the arXiv version of a paper by title.
+
+        Only runs when the paper has no arXiv ID and does have a title.
+        On success, enriches the paper with arxiv_id, pdf_url, and abstract
+        (if Scholar's snippet is shorter).
+        """
+        if getattr(paper, "arxiv_id", ""):
+            return
+        title = getattr(paper, "title", "")
+        if not title or not title.strip():
+            return
+
+        try:
+            arxiv_paper = self._arxiv_client.find_by_title(title)
+            if arxiv_paper and arxiv_paper.arxiv_id:
+                setattr(paper, "arxiv_id", arxiv_paper.arxiv_id)
+                if arxiv_paper.pdf_url:
+                    setattr(paper, "pdf_url", arxiv_paper.pdf_url)
+                # Prefer arXiv abstract (usually longer/better than Scholar snippet)
+                if arxiv_paper.abstract and len(arxiv_paper.abstract) > len(getattr(paper, "abstract", "") or ""):
+                    setattr(paper, "abstract", arxiv_paper.abstract)
+                if not getattr(paper, "url", "") and arxiv_paper.url:
+                    setattr(paper, "url", arxiv_paper.url)
+                if arxiv_paper.published:
+                    setattr(paper, "published", arxiv_paper.published)
+        except Exception as e:
+            print(f"[LiteratureRetrieval] arXiv reverse lookup failed for '{title[:80]}': {e}")
+
+    # ── Query building ──
 
     def _build_queries(
         self,
@@ -153,6 +189,8 @@ class LiteratureRetrieval:
                 RetrievalQuery(topic_name="main topic", keyword=fallback_query.strip())
             )
         return queries
+
+    # ── Annotation & dedup ──
 
     def _annotate_paper(
         self,
@@ -186,6 +224,8 @@ class LiteratureRetrieval:
             setattr(left, "arxiv_id", getattr(right, "arxiv_id"))
         if not getattr(left, "abstract", "") and getattr(right, "abstract", ""):
             setattr(left, "abstract", getattr(right, "abstract"))
+        elif getattr(right, "abstract", "") and len(str(getattr(right, "abstract", ""))) > len(str(getattr(left, "abstract", ""))):
+            setattr(left, "abstract", getattr(right, "abstract"))
         if not getattr(left, "pdf_url", "") and getattr(right, "pdf_url", ""):
             setattr(left, "pdf_url", getattr(right, "pdf_url"))
         if not getattr(left, "url", "") and getattr(right, "url", ""):
@@ -194,15 +234,11 @@ class LiteratureRetrieval:
             setattr(left, "citations", getattr(right, "citations", 0))
         return left
 
+    # ── Scoring ──
+
     def _score_paper(self, paper: Any) -> tuple[float, list[str]]:
         reasons: list[str] = []
         score = 0.0
-
-        sources = getattr(paper, "sources", []) or []
-        source_score = sum(self.SOURCE_WEIGHTS.get(s, 1.0) for s in sources)
-        if source_score:
-            score += source_score
-            reasons.append(f"sources:{','.join(sources)}")
 
         relevance = self._keyword_relevance(paper)
         if relevance:
@@ -222,7 +258,7 @@ class LiteratureRetrieval:
             reasons.append(f"year:{year}")
 
         if getattr(paper, "arxiv_id", ""):
-            score += 1.0
+            score += 2.0
             reasons.append("arxiv_available")
         if getattr(paper, "pdf_url", ""):
             score += 0.5
@@ -269,6 +305,8 @@ class LiteratureRetrieval:
         title = normalize_title(getattr(paper, "title", ""))
         return (score, citations, has_arxiv, title)
 
+
+# ── Helpers ──
 
 def normalize_arxiv_id(arxiv_id: str) -> str:
     cleaned = (

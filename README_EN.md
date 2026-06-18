@@ -12,12 +12,12 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 
 ## Features
 
-- **Intelligent Retrieval**: LLM decomposes research topics into sub-directions, concurrently searches arXiv + Google Scholar
-- **Paper Ranking**: Multi-dimensional scoring (source weight, keyword match, citations, freshness), deduplication & merging
-- **Deep Reading**: Auto-parse PDFs, generate structured summaries (background, method, innovations, results, etc.)
+- **Intelligent Retrieval**: LLM decomposes research topics into sub-directions, searches Google Scholar and reverse-looks up arXiv versions for full-text information
+- **Paper Ranking**: Multi-dimensional scoring (keyword match, citations, freshness, arXiv completeness), deduplication & merging
+- **Deep Reading**: Auto-download & parse PDFs, generate structured summaries (background, method, innovations, results, etc.)
 - **Paper Review**: LLM-based multi-dimensional review (topic, methodology, experiments, writing, etc.)
-- **Q&A Interaction**: Free-form questions on individual papers with multi-turn conversation support
-- **Streaming Results**: Real-time paper cards appear as results arrive, no need to wait for completion
+- **Q&A Interaction**: Free-form questions on individual papers with citation-traceable answers based on full-text retrieval
+- **Streaming Results**: Papers stream one by one in real time via SSE, cards appear sequentially
 
 ## Tech Stack
 
@@ -25,11 +25,11 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 |----------|------------|
 | Agent Orchestration | LangGraph |
 | LLM Integration | LiteLLM |
-| Literature Search | arXiv API, SerpAPI / 302.ai Google Scholar |
+| Literature Search | Google Scholar (SerpAPI) + arXiv title reverse lookup |
 | PDF Parsing | PyMuPDF |
-| Vector Search | ChromaDB |
+| Vector Search | SimpleStore (TF-IDF) |
 | Structured Storage | SQLite |
-| Web Framework | FastAPI + Jinja2 Templates |
+| Web Framework | FastAPI + Vanilla HTML/CSS/JS |
 
 ## Quick Start
 
@@ -65,7 +65,7 @@ FAST_LLM_MODEL=gpt-4o-mini
 FAST_LLM_API_KEY=sk-your-key
 FAST_LLM_BASE_URL=https://api.openai.com/v1
 
-# Google Scholar (optional — uses arXiv only if not configured)
+# Google Scholar (required — primary search source)
 SCHOLAR_API_KEY=sk-your-key
 SCHOLAR_BASE_URL=https://api.302.ai/serpapi/search
 ```
@@ -73,11 +73,8 @@ SCHOLAR_BASE_URL=https://api.302.ai/serpapi/search
 Search parameters can be adjusted in `config/search.yaml`:
 
 ```yaml
-arxiv:
-  max_results_per_keyword: 8   # Max papers per keyword
-  sort_by: "relevance"
 scholar:
-  max_results_per_keyword: 10
+  max_results_per_keyword: 10  # Max papers per keyword
 max_final_papers: 15           # Final number of papers to keep
 ```
 
@@ -118,14 +115,14 @@ PaperAgent/
 │   │   ├── review.py      # Paper review
 │   │   └── reflection.py  # Retrieval quality reflection
 │   ├── retrieval/         # Retrieval core
-│   │   └── literature_retrieval.py  # Multi-source retrieval, dedup, scoring
+│   │   └── literature_retrieval.py  # Scholar search, arXiv reverse lookup, dedup, scoring
 │   ├── tools/
-│   │   ├── arxiv_client.py   # arXiv API client
+│   │   ├── arxiv_client.py   # arXiv title reverse lookup
 │   │   ├── scholar.py        # Google Scholar client
 │   │   └── pdf_parser.py     # PDF parser
 │   ├── workflows/
 │   │   └── research.py    # ResearchWorkflow facade
-│   ├── memory/            # SQLite / ChromaDB storage
+│   ├── memory/            # SimpleStore (TF-IDF) / SQLite storage
 │   ├── corpus/            # Paper corpus management
 │   ├── llm/               # LLM invocation wrapper
 │   ├── domain/            # Domain models

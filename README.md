@@ -12,12 +12,12 @@
 
 ## 功能
 
-- **智能检索**：输入研究主题，LLM 自动拆解为子方向，并发搜索 arXiv + Google Scholar
-- **论文筛选**：多维度评分（来源、关键词匹配度、引用量、时效性），去重合并且排序
-- **深度阅读**：自动解析 PDF，生成结构化中文摘要（背景、方法、创新点、实验结果等）
+- **智能检索**：输入研究主题，LLM 自动拆解为子方向，通过 Google Scholar 检索论文并逐篇反向查找 arXiv 版本补全全文信息
+- **论文筛选**：多维度评分（关键词匹配度、引用量、时效性、arXiv 完整性），去重合并且排序
+- **深度阅读**：自动下载解析 PDF，生成结构化中文摘要（背景、方法、创新点、实验结果等）
 - **论文评审**：LLM 对论文进行多维度评审（选题、方法、实验、写作等）
-- **问答交互**：对单篇论文自由提问，支持多轮对话
-- **流式展示**：检索结果实时流式返回，无需等待全部完成
+- **问答交互**：对单篇论文自由提问，基于论文全文进行引用溯源式回答
+- **流式展示**：检索结果逐篇实时流式推送，论文卡片依次出现
 
 ## 技术栈
 
@@ -25,11 +25,11 @@
 |------|------|
 | Agent 编排 | LangGraph |
 | LLM 接入 | LiteLLM |
-| 文献检索 | arXiv API、SerpAPI / 302.ai Google Scholar |
+| 文献检索 | Google Scholar (SerpAPI) + arXiv 标题反向查找 |
 | PDF 解析 | PyMuPDF |
-| 向量检索 | ChromaDB |
+| 向量检索 | SimpleStore (TF-IDF) |
 | 结构化存储 | SQLite |
-| Web 框架 | FastAPI + Jinja2 模板 |
+| Web 框架 | FastAPI + 原生 HTML/CSS/JS |
 
 ## 快速开始
 
@@ -65,7 +65,7 @@ FAST_LLM_MODEL=gpt-4o-mini
 FAST_LLM_API_KEY=sk-your-key
 FAST_LLM_BASE_URL=https://api.openai.com/v1
 
-# Google Scholar（可选，不配置则仅用 arXiv）
+# Google Scholar（必填 —— 主搜索源）
 SCHOLAR_API_KEY=sk-your-key
 SCHOLAR_BASE_URL=https://api.302.ai/serpapi/search
 ```
@@ -73,11 +73,8 @@ SCHOLAR_BASE_URL=https://api.302.ai/serpapi/search
 搜索参数可在 `config/search.yaml` 中调整：
 
 ```yaml
-arxiv:
-  max_results_per_keyword: 8   # 每个关键词最多返回篇数
-  sort_by: "relevance"
 scholar:
-  max_results_per_keyword: 10
+  max_results_per_keyword: 10  # 每个关键词最多返回篇数
 max_final_papers: 15           # 最终保留论文数
 ```
 
@@ -118,14 +115,14 @@ PaperAgent/
 │   │   ├── review.py      # 论文评审
 │   │   └── reflection.py  # 检索质量反思
 │   ├── retrieval/         # 检索核心
-│   │   └── literature_retrieval.py  # 多源检索、去重、评分
+│   │   └── literature_retrieval.py  # Scholar 检索、arXiv 反向查找、去重、评分
 │   ├── tools/
-│   │   ├── arxiv_client.py   # arXiv API 客户端
+│   │   ├── arxiv_client.py   # arXiv 标题反向查找
 │   │   ├── scholar.py        # Google Scholar 客户端
 │   │   └── pdf_parser.py     # PDF 解析
 │   ├── workflows/
 │   │   └── research.py    # ResearchWorkflow 门面
-│   ├── memory/            # SQLite / ChromaDB 存储
+│   ├── memory/            # SimpleStore (TF-IDF) / SQLite 存储
 │   ├── corpus/            # 论文语料管理
 │   ├── llm/               # LLM 调用封装
 │   ├── domain/            # 领域模型

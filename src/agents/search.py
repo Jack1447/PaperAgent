@@ -2,6 +2,7 @@
 Search Agent
 对 Planner 输出的子主题执行论文检索
 """
+import asyncio
 from typing import Any
 
 from src.agents.base import BaseAgent
@@ -24,7 +25,7 @@ class SearchAgent(BaseAgent):
         return {"papers": papers}
 
     async def run_stream(self, state: dict[str, Any]):
-        """Async generator that yields papers one by one."""
+        """Async generator that yields papers one by one with flush delay."""
         subtopics = state.get("subtopics", [])
         fallback = state.get("user_query", "")
         max_papers = state.get("max_papers", 15)
@@ -35,3 +36,4 @@ class SearchAgent(BaseAgent):
             fallback_query=fallback,
         ):
             yield paper
+            await asyncio.sleep(0.2)  # 让事件循环有时间 flush SSE 事件，实现逐篇展示

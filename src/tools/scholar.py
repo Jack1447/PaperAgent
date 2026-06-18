@@ -1,5 +1,7 @@
 """
 SerpAPI Scholar 客户端 (通过 302.ai / SerpAPI 代理)
+
+纯 SerpAPI 封装 —— arXiv 反向查找由 LiteratureRetrieval 层负责。
 """
 import re
 import time
@@ -18,14 +20,13 @@ class ScholarClient:
     API 参考: https://serpapi.com/google-scholar-api
     """
 
-    def __init__(self, api_key: str = "", base_url: str = "", arxiv_client=None):
+    def __init__(self, api_key: str = "", base_url: str = ""):
         config = get_search_config().get("scholar", {})
         self.max_results = config.get("max_results_per_keyword", 10)
         self.api_key = api_key
         self.base_url = base_url or config.get("base_url", "https://serpapi.com/search")
         self._last_request_time = 0.0
         self.rate_limit = config.get("rate_limit_seconds", 2)
-        self._arxiv_client = arxiv_client  # for reverse lookup
 
     def _rate_limit(self):
         elapsed = time.time() - self._last_request_time
@@ -96,16 +97,8 @@ class ScholarClient:
                 if arxiv_match:
                     paper.arxiv_id = arxiv_match.group(1)
                     paper.pdf_url = f"https://arxiv.org/pdf/{paper.arxiv_id}.pdf"
-                elif self._arxiv_client and paper.title:
-                    # Try reverse lookup on arXiv by title
-                    arxiv_paper = self._arxiv_client.find_by_title(paper.title)
-                    if arxiv_paper and arxiv_paper.arxiv_id:
-                        paper.arxiv_id = arxiv_paper.arxiv_id
-                        paper.pdf_url = arxiv_paper.pdf_url
-                        if not paper.abstract:
-                            paper.abstract = arxiv_paper.abstract
-                        if not paper.url:
-                            paper.url = arxiv_paper.url
+
+                # arXiv reverse lookup is handled by LiteratureRetrieval layer
 
                 cited_by = item.get("inline_links", {}).get("cited_by", {})
                 paper.citations = cited_by.get("total", 0)
