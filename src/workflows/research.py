@@ -180,6 +180,26 @@ class ResearchWorkflow:
         except Exception as exc:
             return WorkflowResult.error("review", workflow_error_message(exc))
 
+    async def compare_papers(
+        self,
+        papers_to_compare: list[dict[str, str]],
+    ) -> WorkflowResult[str]:
+        """对多篇已生成摘要的论文进行对比分析。
+
+        papers_to_compare: [{title, summary}, ...]
+        """
+        if len(papers_to_compare) < 2:
+            return WorkflowResult.error("compare", "请至少选择两篇论文进行对比分析。")
+
+        try:
+            from src.agents.compare import CompareAgent
+
+            agent = CompareAgent()
+            result = await agent.run({"papers_to_compare": papers_to_compare})
+            return WorkflowResult.success(result.get("comparison", ""))
+        except Exception as exc:
+            return WorkflowResult.error("compare", workflow_error_message(exc))
+
 
 def parse_arxiv_link(link: str) -> str | None:
     """Extract arXiv ID from an arXiv URL, PDF URL, or raw ID."""

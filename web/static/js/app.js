@@ -21,6 +21,16 @@
     let _currentQuery = "";
     let _summaryPending = {};  // uid → Promise, so review waits for summary
 
+    // ── Compare state ──
+    let comparePanelOpen = false;
+    let selectedCompareIds = new Set();   // uids selected for comparison (current session)
+    function compareHistKey() { return "compare_" + (_currentQuery || ""); }
+    function getCompareHistory() { return lsGet(compareHistKey(), []); }
+    function setCompareHistory(arr) { lsSet(compareHistKey(), arr); }
+    function getComparablePapers() {
+        return papers.filter(p => visitedPapers.has(p.uid) && summaryCache[p.uid]);
+    }
+
     // ── Snapshot save/restore ──
     function saveSnapshot() {
         if (!_currentQuery) return;
@@ -46,6 +56,8 @@
         paperMap = {};
         for (const p of papers) paperMap[p.uid] = p;
         _currentQuery = query;
+        selectedCompareIds.clear();
+        if (comparePanelOpen) renderCompare();
         rebuildPaperList();
         if (subtopics.length) renderSubtopics();
         si.value = query;
@@ -158,6 +170,8 @@
         pl.innerHTML = ""; sc.innerHTML = "";
         es.style.display = "none"; st.style.display = "none";
         _currentQuery = query;
+        selectedCompareIds.clear();
+        if (comparePanelOpen) renderCompare();
         addHistory(query);
         showLoading("正在规划研究主题...");
 
@@ -698,7 +712,7 @@
     });
 
     // New search button
-    snew.addEventListener("click", () => {
+    function newSearch() {
         papers = []; subtopics = []; paperMap = {};
         summaryCache = {}; reviewCache = {}; chatCache = {};
         rebuildPaperList();
@@ -707,7 +721,12 @@
         es.style.display = "block";
         si.value = "";
         si.focus();
-    });
+    }
+    snew.addEventListener("click", newSearch);
+
+    // Header (logo + title) → new search
+    const appHeader = $("app-header");
+    if (appHeader) appHeader.addEventListener("click", newSearch);
 
     // History item click
     shl.addEventListener("click", (e) => {
@@ -733,6 +752,188 @@
     ci.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && currentPaperId) { e.preventDefault(); doSendChat(currentPaperId); }
     });
+
+    // ── Compare panel ──
+    const cmpToggle = $("compare-toggle-btn"), cmpPanel = $("compare-panel"), cmpDivider = $("compare-divider");
+    const cmpClose = $("compare-close-btn"), cmpRun = $("compare-run-btn"), cmpResult = $("compare-result");
+    const cmpCandList = $("compare-candidate-list"), cmpCandCount = $("compare-candidate-count");
+    const cmpSelList = $("compare-selected-list"), cmpSelCount = $("compare-selected-count");
+    const cmpHistList = $("compare-history-list");
+    const cmpHistHead = $("compare-history-head"), cmpCandHead = $("compare-candidates-head");
+    const viewSearch = $("view-search");
+
+    const CHECK_SVG = '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>';
+    const X_SVG = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+
+    function scrollToPaperCard(uid) {
+        const card = pl.querySelector(`.paper-card[data-uid="${uid}"]`);
+        if (!card) return;
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.style.transition = "box-shadow .2s";
+        card.style.boxShadow = "0 0 0 3px rgba(37,99,235,.4)";
+        setTimeout(() => { card.style.boxShadow = ""; }, 1200);
+    }
+
+    function toggleComparePanel() {
+        comparePanelOpen = !comparePanelOpen;
+        viewSearch.classList.toggle("compare-open", comparePanelOpen);
+        cmpToggle.classList.toggle("active", comparePanelOpen);
+        if (comparePanelOpen) {
+            const w = lsGet("compare_width", null);
+            if (w) cmpPanel.style.flexBasis = w;
+            renderCompare();
+        }
+    }
+
+    function renderCompare() {
+        renderCompareCandidates();
+        renderCompareSelected();
+        renderCompareHistory();
+        updateRunButton();
+    }
+
+    function renderCompareCandidates() {
+        const list = getComparablePapers();
+        cmpCandCount.textContent = list.length;
+        if (!list.length) {
+            cmpCandList.innerHTML = '<div class="compare-empty">暂无可对比论文。请先点击论文查看详情并生成摘要。</div>';
+            return;
+        }
+        cmpCandList.innerHTML = "";
+        for (const p of list) {
+            const checked = selectedCompareIds.has(p.uid);
+            const row = document.createElement("div");
+            row.className = "compare-row";
+            row.innerHTML = `
+                <div class="compare-row-check${checked ? ' checked' : ''}" data-uid="${p.uid}">${CHECK_SVG}</div>
+                <span class="compare-row-title" data-uid="${p.uid}" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>`;
+            row.querySelector(".compare-row-check").addEventListener("click", () => toggleCompareSelect(p.uid));
+            row.querySelector(".compare-row-title").addEventListener("click", () => scrollToPaperCard(p.uid));
+            cmpCandList.appendChild(row);
+        }
+    }
+
+    function renderCompareSelected() {
+        const ids = [...selectedCompareIds];
+        cmpSelCount.textContent = ids.length;
+        if (!ids.length) {
+            cmpSelList.innerHTML = '<div class="compare-empty">勾选左侧候选论文加入对比列表。</div>';
+            return;
+        }
+        cmpSelList.innerHTML = "";
+        for (const uid of ids) {
+            const p = paperMap[uid];
+            if (!p) continue;
+            const row = document.createElement("div");
+            row.className = "compare-row";
+            row.innerHTML = `
+                <span class="compare-row-title" data-uid="${uid}" title="${escapeHtml(p.title)}">${escapeHtml(p.title)}</span>
+                <button class="compare-row-remove" data-uid="${uid}">${X_SVG}</button>`;
+            row.querySelector(".compare-row-title").addEventListener("click", () => scrollToPaperCard(uid));
+            row.querySelector(".compare-row-remove").addEventListener("click", () => toggleCompareSelect(uid));
+            cmpSelList.appendChild(row);
+        }
+    }
+
+    function toggleCompareSelect(uid) {
+        if (selectedCompareIds.has(uid)) selectedCompareIds.delete(uid);
+        else selectedCompareIds.add(uid);
+        renderCompareCandidates();
+        renderCompareSelected();
+        updateRunButton();
+    }
+
+    function updateRunButton() {
+        cmpRun.disabled = selectedCompareIds.size < 2;
+    }
+
+    function renderCompareHistory() {
+        const hist = getCompareHistory();
+        if (!hist.length) {
+            cmpHistList.innerHTML = '<div class="compare-empty">暂无对比历史。</div>';
+            return;
+        }
+        cmpHistList.innerHTML = "";
+        hist.forEach((h, i) => {
+            const item = document.createElement("div");
+            item.className = "compare-history-item";
+            item.innerHTML = `<div class="ch-date">${h.date}</div><div class="ch-titles">${escapeHtml(h.titles)}</div>`;
+            item.addEventListener("click", () => { cmpResult.innerHTML = h.html; });
+            cmpHistList.appendChild(item);
+        });
+    }
+
+    async function runCompare() {
+        const ids = [...selectedCompareIds];
+        if (ids.length < 2) return;
+        cmpRun.disabled = true;
+        cmpResult.innerHTML = '<div class="compare-result-loading"><div class="spinner"></div>正在对比分析...</div>';
+        try {
+            const data = await apiPost("/api/compare", { paper_ids: ids.join(",") });
+            const html = md(data.comparison || "");
+            cmpResult.innerHTML = html;
+            // save to session history
+            const titles = ids.map(u => (paperMap[u] && paperMap[u].title) || u).join("、");
+            const hist = getCompareHistory();
+            hist.unshift({
+                date: new Date().toLocaleString("zh-CN", { hour12: false }),
+                titles: titles,
+                html: html,
+            });
+            if (hist.length > 20) hist.length = 20;
+            setCompareHistory(hist);
+            renderCompareHistory();
+        } catch (e) {
+            cmpResult.innerHTML = `<div class="compare-empty" style="color:#dc2626">${escapeHtml(e.message || "对比分析失败")}</div>`;
+        } finally {
+            updateRunButton();
+        }
+    }
+
+    // Section collapse
+    function bindCompareSection(head) {
+        if (!head) return;
+        head.addEventListener("click", () => head.parentElement.classList.toggle("collapsed"));
+    }
+
+    // Divider drag resize
+    function initCompareResize() {
+        let dragging = false;
+        cmpDivider.addEventListener("mousedown", (e) => {
+            dragging = true;
+            cmpDivider.classList.add("dragging");
+            document.body.style.cursor = "col-resize";
+            document.body.style.userSelect = "none";
+            e.preventDefault();
+        });
+        document.addEventListener("mousemove", (e) => {
+            if (!dragging) return;
+            const total = viewSearch.clientWidth;
+            const sidebar = $("search-sidebar").offsetWidth;
+            const usable = total - sidebar;
+            let w = total - e.clientX;          // distance from right edge
+            const minW = usable * 0.25, maxW = usable * 0.6;
+            w = Math.max(minW, Math.min(maxW, w));
+            cmpPanel.style.flexBasis = w + "px";
+        });
+        document.addEventListener("mouseup", () => {
+            if (!dragging) return;
+            dragging = false;
+            cmpDivider.classList.remove("dragging");
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+            lsSet("compare_width", cmpPanel.style.flexBasis);
+        });
+    }
+
+    if (cmpToggle) {
+        cmpToggle.addEventListener("click", toggleComparePanel);
+        cmpClose.addEventListener("click", toggleComparePanel);
+        cmpRun.addEventListener("click", runCompare);
+        bindCompareSection(cmpHistHead);
+        bindCompareSection(cmpCandHead);
+        initCompareResize();
+    }
 
     // ── Init ──
     async function loadState() {

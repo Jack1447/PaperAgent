@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PaperAgent</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=22">
+    <link rel="stylesheet" href="/static/css/style.css?v=24">
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 </head>
 <body>
@@ -31,7 +31,7 @@
         <!-- Main content -->
         <div class="search-main">
             <div class="search-main-inner">
-            <header class="header">
+            <header class="header" id="app-header" title="点击开始新检索">
                 <svg class="logo" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#1a2332" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="8" y1="7" x2="16" y2="7"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
                 <h1>PaperAgent</h1>
             </header>
@@ -57,6 +57,10 @@
 
             <div class="stats" id="stats" style="display:none">
                 <span class="stat-value" id="stat-papers">0</span><span class="stat-label">篇论文</span>
+                <button class="compare-toggle-btn" id="compare-toggle-btn" title="对比分析">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    对比分析
+                </button>
             </div>
 
             <div id="subtopics-container"></div>
@@ -68,6 +72,60 @@
             </div>
             </div><!-- /search-main-inner -->
         </div>
+
+        <!-- Compare resize divider -->
+        <div class="compare-divider" id="compare-divider"></div>
+
+        <!-- Compare panel (split-pane, page-occupying) -->
+        <aside class="compare-panel" id="compare-panel">
+            <div class="compare-panel-header">
+                <span class="compare-panel-title">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    对比分析
+                </span>
+                <button class="compare-close-btn" id="compare-close-btn" title="关闭">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </div>
+
+            <div class="compare-panel-body">
+                <!-- History section (collapsible) -->
+                <div class="compare-section">
+                    <div class="compare-section-head" id="compare-history-head">
+                        <svg class="compare-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        <span>历史对比</span>
+                    </div>
+                    <div class="compare-section-content" id="compare-history-list"></div>
+                </div>
+
+                <!-- Candidate section -->
+                <div class="compare-section">
+                    <div class="compare-section-head" id="compare-candidates-head">
+                        <svg class="compare-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                        <span>候选论文</span>
+                        <span class="compare-count" id="compare-candidate-count">0</span>
+                    </div>
+                    <div class="compare-section-content" id="compare-candidate-list"></div>
+                </div>
+
+                <!-- Selected section -->
+                <div class="compare-section">
+                    <div class="compare-section-head static">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                        <span>对比列表</span>
+                        <span class="compare-count" id="compare-selected-count">0</span>
+                    </div>
+                    <div class="compare-section-content" id="compare-selected-list"></div>
+                </div>
+
+                <button class="btn btn-primary compare-run-btn" id="compare-run-btn" disabled>开始对比分析</button>
+
+                <!-- Result -->
+                <div class="compare-result" id="compare-result"></div>
+            </div>
+        </aside>
     </div>
 
     <!-- ===== DETAIL VIEW ===== -->
@@ -176,6 +234,6 @@
         </div>
     </div>
 
-    <script src="/static/js/app.js?v=21"></script>
+    <script src="/static/js/app.js?v=23"></script>
 </body>
 </html>

@@ -403,6 +403,39 @@ async def review_paper(paper_id: str = Form(...)):
     return JSONResponse({"review": review, "uid": paper_id})
 
 
+@app.post("/api/compare")
+async def compare_papers(paper_ids: str = Form(...)):
+    ids = [pid.strip() for pid in paper_ids.split(",") if pid.strip()]
+    if len(ids) < 2:
+        raise HTTPException(status_code=400, detail="请至少选择两篇论文进行对比分析。")
+
+    title_by_uid = {paper_uid(p): getattr(p, "title", "") for p in state.papers}
+
+    papers_to_compare = []
+    for pid in ids:
+        summary = state.summaries.get(pid, "")
+        if not summary:
+            continue
+        papers_to_compare.append({
+            "title": title_by_uid.get(pid, pid),
+            "summary": summary,
+        })
+
+    if len(papers_to_compare) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="选中的论文缺少摘要，请先查看论文生成摘要。",
+        )
+
+    wf = get_workflow()
+    result = await wf.compare_papers(papers_to_compare)
+    if not result.ok:
+        msg = result.failure.message if result.failure else "对比分析失败"
+        raise HTTPException(status_code=500, detail=msg)
+
+    return JSONResponse({"comparison": result.value, "paper_ids": ids})
+
+
 @app.post("/api/ask")
 async def ask_paper(paper_id: str = Form(...), question: str = Form(...)):
     paper_title = ""

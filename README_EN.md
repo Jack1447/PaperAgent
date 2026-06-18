@@ -16,6 +16,7 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 - **Paper Ranking**: Multi-dimensional scoring (keyword match, citations, freshness, arXiv completeness), deduplication & merging
 - **Deep Reading**: Auto-download & parse PDFs, generate structured summaries (background, method, innovations, results, etc.)
 - **Paper Review**: LLM-based multi-dimensional review (topic, methodology, experiments, writing, etc.)
+- **Multi-Paper Comparison**: Select multiple summarized papers and generate a side-by-side comparison table and synthesis with one click (resizable compare panel, per-session comparison history)
 - **Q&A Interaction**: Free-form questions on individual papers with citation-traceable answers based on full-text retrieval
 - **Streaming Results**: Papers stream one by one in real time via SSE, cards appear sequentially
 
@@ -93,7 +94,8 @@ Open `http://127.0.0.1:8000` in your browser.
 3. Select papers of interest, click "Generate Summary" for structured summaries
 4. Click "Review" for LLM-based multi-dimensional evaluation
 5. Ask free-form questions in the paper dialog for deep reading
-6. Support notes and translation
+6. Click "Compare" to open the compare panel and run a side-by-side comparison of multiple summarized papers
+7. Support notes and translation
 
 ## Project Structure
 
@@ -113,6 +115,7 @@ PaperAgent/
 │   │   ├── summarize.py   # Paper summarization
 │   │   ├── reading.py     # Paper Q&A
 │   │   ├── review.py      # Paper review
+│   │   ├── compare.py     # Multi-paper comparison
 │   │   └── reflection.py  # Retrieval quality reflection
 │   ├── retrieval/         # Retrieval core
 │   │   └── literature_retrieval.py  # Scholar search, arXiv reverse lookup, dedup, scoring
