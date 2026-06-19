@@ -6,6 +6,12 @@
 
 [English](README_EN.md)
 
+## 更新日志
+
+### v2
+
+- **向量检索升级**：将单篇论文 chunk 检索从 TF-IDF 词频匹配升级为 **FAISS 稠密语义检索**。每篇论文独立建索引（`IndexFlatIP` + 向量归一化 = cosine），embedding 通过 LiteLLM 调用（默认 `bge-m3`，可在 `.env` 中配置），能命中同义/释义表达。embedding 不可用时自动回退到摘要/abstract 上下文，问答不中断。
+
 ## Demo
 
 ![paperagent-ezgif](asset/paperagent_gif.gif)
@@ -28,7 +34,7 @@
 | LLM 接入 | LiteLLM |
 | 文献检索 | Google Scholar (SerpAPI) + arXiv 标题反向查找 |
 | PDF 解析 | PyMuPDF |
-| 向量检索 | SimpleStore (TF-IDF) |
+| 向量检索 | FAISS 稠密语义检索（LiteLLM Embedding，默认 bge-m3）|
 | 结构化存储 | SQLite |
 | Web 框架 | FastAPI + 原生 HTML/CSS/JS |
 
@@ -65,6 +71,9 @@ LLM_BASE_URL=https://api.openai.com/v1
 FAST_LLM_MODEL=gpt-4o-mini
 FAST_LLM_API_KEY=sk-your-key
 FAST_LLM_BASE_URL=https://api.openai.com/v1
+
+# Embedding（论文 chunk 语义检索，默认复用主 LLM 的 Key/BaseURL）
+EMBEDDING_MODEL=bge-m3
 
 # Google Scholar（必填 —— 主搜索源）
 SCHOLAR_API_KEY=sk-your-key
@@ -125,7 +134,7 @@ PaperAgent/
 │   │   └── pdf_parser.py     # PDF 解析
 │   ├── workflows/
 │   │   └── research.py    # ResearchWorkflow 门面
-│   ├── memory/            # SimpleStore (TF-IDF) / SQLite 存储
+│   ├── memory/            # FAISS 向量检索 / SQLite 存储
 │   ├── corpus/            # 论文语料管理
 │   ├── llm/               # LLM 调用封装
 │   ├── domain/            # 领域模型

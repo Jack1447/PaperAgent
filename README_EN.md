@@ -28,7 +28,7 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 | LLM Integration | LiteLLM |
 | Literature Search | Google Scholar (SerpAPI) + arXiv title reverse lookup |
 | PDF Parsing | PyMuPDF |
-| Vector Search | SimpleStore (TF-IDF) |
+| Vector Search | FAISS dense semantic search (LiteLLM Embedding, default bge-m3) |
 | Structured Storage | SQLite |
 | Web Framework | FastAPI + Vanilla HTML/CSS/JS |
 
@@ -65,6 +65,9 @@ LLM_BASE_URL=https://api.openai.com/v1
 FAST_LLM_MODEL=gpt-4o-mini
 FAST_LLM_API_KEY=sk-your-key
 FAST_LLM_BASE_URL=https://api.openai.com/v1
+
+# Embedding (paper chunk semantic search; reuses main LLM Key/BaseURL by default)
+EMBEDDING_MODEL=bge-m3
 
 # Google Scholar (required — primary search source)
 SCHOLAR_API_KEY=sk-your-key
@@ -125,7 +128,7 @@ PaperAgent/
 │   │   └── pdf_parser.py     # PDF parser
 │   ├── workflows/
 │   │   └── research.py    # ResearchWorkflow facade
-│   ├── memory/            # SimpleStore (TF-IDF) / SQLite storage
+│   ├── memory/            # FAISS vector search / SQLite storage
 │   ├── corpus/            # Paper corpus management
 │   ├── llm/               # LLM invocation wrapper
 │   ├── domain/            # Domain models

@@ -11,7 +11,7 @@ from tenacity import AsyncRetrying, stop_after_attempt, wait_exponential
 # Silence 'Give Feedback' banners on API errors
 litellm.set_verbose = False
 
-from config.settings import get_llm_config, get_retry_config
+from config.settings import get_llm_config, get_retry_config, get_embedding_config
 from src.llm.json_utils import extract_json_value
 
 logger = logging.getLogger("paperagent.llm")
@@ -146,3 +146,70 @@ class LLMProvider:
 
         text = await self.chat(messages, system=full_system)
         return extract_json_value(text)
+
+
+class EmbeddingProvider:
+    """LiteLLM embedding 封装，批量取向量，带重试。
+
+    复用主 LLM 的 Key/BaseURL（可由 EMBEDDING_* 覆盖），默认模型 bge-m3。
+    """
+
+    def __init__(self):
+        config = get_embedding_config()
+        self.model: str = config["model"]
+        self.api_key: str = config["api_key"]
+        self.base_url: Optional[str] = config["base_url"]
+
+        retry_cfg = get_retry_config()
+        self.max_retries = retry_cfg["max_attempts"]
+        self.retry_min_wait = retry_cfg["min_wait"]
+        self.retry_max_wait = retry_cfg["max_wait"]
+
+    def _build_kwargs(self) -> dict:
+        # 显式指定 openai 兼容 provider，让 LiteLLM 把原始 model 名（如
+        # BAAI/bge-m3）原样发给 302.ai，避免它把 "BAAI/" 误当作 provider 前缀。
+        kwargs = {
+            "model": self.model,
+            "api_key": self.api_key,
+            "custom_llm_provider": "openai",
+        }
+        if self.base_url:
+            kwargs["api_base"] = self.base_url
+        return kwargs
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        """批量取 embedding，返回与输入等长的向量列表。"""
+        if not texts:
+            return []
+
+        async def _call():
+            return await litellm.aembedding(input=texts, **self._build_kwargs())
+
+        async for attempt in AsyncRetrying(
+            stop=stop_after_attempt(self.max_retries),
+            wait=wait_exponential(
+                multiplier=1,
+                min=self.retry_min_wait,
+                max=self.retry_max_wait,
+            ),
+            reraise=True,
+        ):
+            with attempt:
+                try:
+                    response = await _call()
+                except Exception as e:
+                    logger.warning(
+                        "Embedding call failed (attempt %d/%d): model=%s error=%s",
+                        attempt.retry_state.attempt_number if attempt.retry_state else 1,
+                        self.max_retries,
+                        self.model,
+                        str(e)[:300],
+                    )
+                    raise
+        # litellm 返回 {"data": [{"embedding": [...]}, ...]}
+        data = response["data"] if isinstance(response, dict) else response.data
+        return [item["embedding"] for item in data]
+
+    async def embed_one(self, text: str) -> list[float]:
+        result = await self.embed([text])
+        return result[0] if result else []

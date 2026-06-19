@@ -62,6 +62,29 @@ def get_retry_config() -> dict:
     return _llm_config["retry"]
 
 
+# ========== Embedding 配置 ==========
+
+def get_embedding_config() -> dict:
+    """获取 embedding 配置。
+
+    默认复用主 LLM 的 API Key / Base URL，可通过 EMBEDDING_* 单独覆盖。
+    """
+    model = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+    api_key = os.getenv("EMBEDDING_API_KEY") or os.getenv("LLM_API_KEY")
+    base_url = os.getenv("EMBEDDING_BASE_URL") or os.getenv("LLM_BASE_URL")
+
+    if not api_key:
+        raise LLMConfigError(
+            "请在 .env 文件中配置 EMBEDDING_API_KEY 或 LLM_API_KEY（embedding 复用主 LLM Key）"
+        )
+
+    return {
+        "model": model,
+        "api_key": api_key,
+        "base_url": base_url or None,
+    }
+
+
 # ========== 搜索配置 ==========
 
 def get_search_config() -> dict:

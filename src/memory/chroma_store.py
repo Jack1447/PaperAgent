@@ -146,7 +146,8 @@ class SimpleStore:
         self._persist_path = _store_path()
         self._save_lock = threading.Lock()
         self.summaries = _SimpleVectorStore()
-        self.chunks = _SimpleVectorStore()
+        from src.memory.faiss_store import FaissStore
+        self.chunks = FaissStore()  # chunk 语义检索走 FAISS
         self._load()
 
     def _load(self):
@@ -156,7 +157,6 @@ class SimpleStore:
             with open(self._persist_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self.summaries.from_dict(data.get("summaries", {}))
-            self.chunks.from_dict(data.get("chunks", {}))
         except Exception:
             pass  # corrupted file, start fresh
 
@@ -164,7 +164,6 @@ class SimpleStore:
         os.makedirs(os.path.dirname(self._persist_path), exist_ok=True)
         data = {
             "summaries": self.summaries.to_dict(),
-            "chunks": self.chunks.to_dict(),
         }
         with self._save_lock:
             try:
@@ -189,23 +188,11 @@ class SimpleStore:
         return result[0] if result else None
 
     def add_chunks(self, arxiv_id: str, chunks: list[dict]):
-        if not chunks:
-            return
-        ids = [f"{arxiv_id}_{c['chunk_id']}" for c in chunks]
-        old_ids = [k for k in self.chunks._docs.keys() if k.startswith(f"{arxiv_id}_")]
-        if old_ids:
-            self.chunks.delete(old_ids)
-        for i, chunk in enumerate(chunks):
-            meta = {
-                "arxiv_id": arxiv_id,
-                "chunk_id": chunk.get("chunk_id", i),
-                "section": chunk.get("section", "unknown"),
-            }
-            self.chunks.upsert(ids[i], chunk["text"], meta)
-        self._save()
+        # chunk 向量化与持久化由 FaissStore 负责（每篇一个索引，自带覆盖）
+        self.chunks.add_chunks(arxiv_id, chunks)
 
     def search_chunks(self, arxiv_id: str, query: str, top_k: int = 5) -> list[dict]:
-        return self.chunks.query(query, top_k, where={"arxiv_id": arxiv_id})
+        return self.chunks.search_chunks(arxiv_id, query, top_k=top_k)
 
     def paper_exists(self, arxiv_id: str) -> bool:
         return self.summaries.get(arxiv_id) is not None
