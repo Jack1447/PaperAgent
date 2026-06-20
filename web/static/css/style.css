@@ -43,12 +43,11 @@ body {
     transition: opacity .12s;
 }
 .header:hover { opacity: .7; }
-.header h1 {
-    font-size: 1.5rem; font-weight: 700; color: var(--gray-900);
-    letter-spacing: -.02em;
+.logo-img {
+    height: 60px;
+    width: auto;
+    display: block;
 }
-.logo { flex-shrink: 0; }
-.logo svg { width: 32px; height: 32px; }
 
 /* ── Button system ── */
 .btn {
