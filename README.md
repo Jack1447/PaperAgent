@@ -1,4 +1,4 @@
-<img src="D:\Study\NLP\期末作业\PaperAgent\asset\logo.png" alt="logo"  />
+<img src="asset/logo.png" alt="logo"  />
 
 多智能体论文检索与阅读工作台 —— 输入研究主题，自动搜索、筛选、阅读论文。
 
