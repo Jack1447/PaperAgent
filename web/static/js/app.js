@@ -102,6 +102,7 @@
     const recPanel = $("recommend-panel"), recClose = $("recommend-close");
     const recContent = $("recommend-content"), recKeywords = $("recommend-keywords");
     const recMemory = $("recommend-memory"), memToggle = $("memory-toggle");
+    const recEmpty = $("recommend-empty"), recGenBtn = $("recommend-gen-btn");
     const pl = $("paper-list"), es = $("empty-state"), st = $("stats"), sp = $("stat-papers");
     const sc = $("subtopics-container");
     const sbar = $("search-sidebar"), sbt = $("sidebar-toggle-btn");
@@ -771,11 +772,22 @@
         }
     }
 
+    function showRecommendIdle() {
+        recPanel.style.display = "";
+        recMemory.style.display = "none";
+        memToggle.textContent = "查看记忆文档";
+        recKeywords.innerHTML = "";
+        recContent.innerHTML = "";
+        recEmpty.style.display = "";
+    }
+
     async function doRecommend() {
         recPanel.style.display = "";
         recMemory.style.display = "none";
         memToggle.textContent = "查看记忆文档";
         recKeywords.innerHTML = "";
+        recEmpty.style.display = "none";
+        recGenBtn.disabled = true;
         recContent.innerHTML = '<div style="color:#98a2b3">正在生成个性化推荐...</div>';
         try {
             const r = await fetch("/api/recommend", { method: "POST" });
@@ -784,6 +796,8 @@
             renderRecommendation(data.recommendation || "(暂无推荐)");
         } catch (e) {
             recContent.innerHTML = `<div style="color:#dc2626">${escapeHtml(e.message || "推荐失败")}</div>`;
+        } finally {
+            recGenBtn.disabled = false;
         }
     }
 
@@ -807,6 +821,7 @@
 
     recClose.addEventListener("click", () => { recPanel.style.display = "none"; });
     memToggle.addEventListener("click", toggleMemory);
+    recGenBtn.addEventListener("click", doRecommend);
 
     // Sidebar toggle
     sbt.addEventListener("click", () => {
@@ -823,7 +838,7 @@
         es.style.display = "block";
         si.value = "";
         si.focus();
-        doRecommend();
+        showRecommendIdle();
     }
     snew.addEventListener("click", newSearch);
 
