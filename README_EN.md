@@ -2,7 +2,7 @@
 
 Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read academic papers by simply entering a research topic.
 
-> *Simplified implementation for reference only. Performance may be suboptimal.*
+> *Coursework. Simplified implementation for reference only. Performance may be suboptimal.*
 
 [中文文档](README.md)
 
