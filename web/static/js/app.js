@@ -99,6 +99,9 @@
     const S = $("view-search"), V = $("view-detail");
     const si = $("search-input"), mr = $("max-results");
     const ab = $("arxiv-btn"), ap = $("arxiv-popover"), ai = $("arxiv-input"), aa = $("arxiv-add-btn");
+    const recPanel = $("recommend-panel"), recClose = $("recommend-close");
+    const recContent = $("recommend-content"), recKeywords = $("recommend-keywords");
+    const recMemory = $("recommend-memory"), memToggle = $("memory-toggle");
     const pl = $("paper-list"), es = $("empty-state"), st = $("stats"), sp = $("stat-papers");
     const sc = $("subtopics-container");
     const sbar = $("search-sidebar"), sbt = $("sidebar-toggle-btn");
@@ -110,6 +113,9 @@
     const panelAbstract = $("panel-abstract"), panelSummary = $("panel-summary"), panelReview = $("panel-review"), panelChat = $("panel-chat"), panelPdf = $("panel-pdf");
     const summaryLoading = $("summary-loading"), reviewLoading = $("review-loading");
     const cm = $("chat-messages"), ci = $("chat-input"), cs = $("chat-send-btn");
+    const ciBtn = $("chat-image-btn"), ciInput = $("chat-image-input");
+    const ciPreview = $("chat-image-preview"), ciThumb = $("chat-image-thumb"), ciRemove = $("chat-image-remove");
+    let selectedChatImage = null;
     const ne = $("notes-editor"), np = $("notes-preview"), ns = $("notes-saved-inline"), npt = $("notes-preview-toggle");
     // PDF viewer
     const pf = $("pdf-frame"), pph = $("pdf-placeholder");
@@ -146,7 +152,7 @@
         if (hash === "search") { showView("search"); currentPaperId = null; }
         else if (hash.startsWith("paper/")) {
             const uid = hash.slice(6);
-            if (paperMap[uid]) { currentPaperId = uid; showView("detail"); renderDetail(uid); }
+            if (paperMap[uid]) { currentPaperId = uid; clearChatImage(); showView("detail"); renderDetail(uid); }
             else { navigate("search"); }
         }
     }
@@ -615,7 +621,8 @@
         cm.innerHTML = "";
         for (const m of msgs) {
             const html = m.role === "assistant" ? md(m.content) : escapeHtml(m.content);
-            cm.innerHTML += `<div class="chat-msg ${m.role}"><div class="chat-bubble">${html}</div></div>`;
+            const img = m.image ? `<img class="chat-img" src="${m.image}" alt="图片">` : "";
+            cm.innerHTML += `<div class="chat-msg ${m.role}"><div class="chat-bubble">${img}${html}</div></div>`;
         }
         const typing = cm.querySelector(".chat-typing");
         if (typing) typing.remove();
@@ -627,19 +634,46 @@
         cm.scrollTop = cm.scrollHeight;
     }
 
+    function clearChatImage() {
+        selectedChatImage = null;
+        ciInput.value = "";
+        ciThumb.src = "";
+        ciPreview.style.display = "none";
+    }
+
+    function onSelectChatImage(file) {
+        if (!file) return;
+        const okTypes = ["image/png", "image/jpeg", "image/webp"];
+        if (!okTypes.includes(file.type)) { alert("仅支持 png / jpg / webp 格式图片"); return; }
+        if (file.size > 8 * 1024 * 1024) { alert("图片大小不能超过 8MB"); return; }
+        selectedChatImage = file;
+        ciThumb.src = URL.createObjectURL(file);
+        ciPreview.style.display = "";
+    }
+
     async function doSendChat(uid) {
         const msg = ci.value.trim();
-        if (!msg) return;
+        const file = selectedChatImage;
+        if (!msg && !file) return;
 
         if (!chatCache[uid]) chatCache[uid] = [];
-        chatCache[uid].push({ role: "user", content: msg });
+        const localEntry = { role: "user", content: msg };
+        if (file) localEntry.image = URL.createObjectURL(file);
+        chatCache[uid].push(localEntry);
         renderChat(uid);
 
         ci.value = ""; ci.disabled = true; cs.disabled = true;
+        clearChatImage();
         showTyping();
 
         try {
-            const data = await apiPost("/api/ask", { paper_id: uid, question: msg });
+            const fd = new FormData();
+            fd.append("paper_id", uid);
+            fd.append("question", msg);
+            if (file) fd.append("image", file);
+            const r = await fetch("/api/ask", { method: "POST", body: fd });
+            if (!r.ok) { const e = await r.json().catch(() => ({ detail: r.statusText })); throw new Error(e.detail || "请求失败"); }
+            const data = await r.json();
             chatCache[uid] = data.history;
             renderChat(uid);
             saveSnapshot();
@@ -706,6 +740,74 @@
         if (e.key === "Enter") { const q = si.value.trim(); if (q) doSearch(q); }
     });
 
+    // ── Recommend ──
+    function parseRecommendKeywords(text) {
+        const m = text.match(/##\s*推荐检索关键词\s*\n([\s\S]*?)(?:\n##\s|\n#\s|$)/);
+        if (!m) return [];
+        return m[1]
+            .split("\n")
+            .map((l) => l.replace(/^[-*]\s*/, "").trim())
+            .filter((l) => l && !l.startsWith("#"));
+    }
+
+    function stripKeywordSection(text) {
+        return text
+            .replace(/##\s*推荐检索关键词[\s\S]*?(?=\n##\s|\n#\s|$)/, "")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim();
+    }
+
+    function renderRecommendation(text) {
+        recContent.innerHTML = md(stripKeywordSection(text));
+        const kws = parseRecommendKeywords(text);
+        recKeywords.innerHTML = "";
+        for (const kw of kws) {
+            const chip = document.createElement("span");
+            chip.className = "recommend-kw";
+            chip.textContent = kw;
+            chip.title = "用该关键词发起检索";
+            chip.addEventListener("click", () => { si.value = kw; doSearch(kw); });
+            recKeywords.appendChild(chip);
+        }
+    }
+
+    async function doRecommend() {
+        recPanel.style.display = "";
+        recMemory.style.display = "none";
+        memToggle.textContent = "查看记忆文档";
+        recKeywords.innerHTML = "";
+        recContent.innerHTML = '<div style="color:#98a2b3">正在生成个性化推荐...</div>';
+        try {
+            const r = await fetch("/api/recommend", { method: "POST" });
+            if (!r.ok) { const e = await r.json().catch(() => ({ detail: r.statusText })); throw new Error(e.detail || "推荐失败"); }
+            const data = await r.json();
+            renderRecommendation(data.recommendation || "(暂无推荐)");
+        } catch (e) {
+            recContent.innerHTML = `<div style="color:#dc2626">${escapeHtml(e.message || "推荐失败")}</div>`;
+        }
+    }
+
+    async function toggleMemory() {
+        if (recMemory.style.display !== "none") {
+            recMemory.style.display = "none";
+            memToggle.textContent = "查看记忆文档";
+            return;
+        }
+        memToggle.textContent = "隐藏记忆文档";
+        recMemory.style.display = "";
+        recMemory.innerHTML = '<div style="color:#98a2b3">加载中...</div>';
+        try {
+            const r = await fetch("/api/memory");
+            const data = await r.json();
+            recMemory.innerHTML = data.memory ? md(data.memory) : '<div style="color:#98a2b3">暂无记忆文档</div>';
+        } catch (e) {
+            recMemory.innerHTML = `<div style="color:#dc2626">加载失败</div>`;
+        }
+    }
+
+    recClose.addEventListener("click", () => { recPanel.style.display = "none"; });
+    memToggle.addEventListener("click", toggleMemory);
+
     // Sidebar toggle
     sbt.addEventListener("click", () => {
         sbar.classList.toggle("collapsed");
@@ -721,6 +823,7 @@
         es.style.display = "block";
         si.value = "";
         si.focus();
+        doRecommend();
     }
     snew.addEventListener("click", newSearch);
 
@@ -752,6 +855,9 @@
     ci.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && currentPaperId) { e.preventDefault(); doSendChat(currentPaperId); }
     });
+    ciBtn.addEventListener("click", () => ciInput.click());
+    ciInput.addEventListener("change", () => onSelectChatImage(ciInput.files[0]));
+    ciRemove.addEventListener("click", clearChatImage);
 
     // ── Compare panel ──
     const cmpToggle = $("compare-toggle-btn"), cmpPanel = $("compare-panel"), cmpDivider = $("compare-divider");

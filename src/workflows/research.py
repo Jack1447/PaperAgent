@@ -142,6 +142,7 @@ class ResearchWorkflow:
         paper_summary: str,
         question: str,
         chat_history: list[dict[str, str]],
+        image_data_url: str = "",
     ) -> WorkflowResult[str]:
         try:
             from src.agents.reading import ReadingAgent
@@ -154,6 +155,7 @@ class ResearchWorkflow:
                 "paper_summary": paper_summary,
                 "user_question": question,
                 "chat_history": chat_history,
+                "image_data_url": image_data_url,
             })
             return WorkflowResult.success(result.get("answer", ""))
         except Exception as exc:
@@ -199,6 +201,28 @@ class ResearchWorkflow:
             return WorkflowResult.success(result.get("comparison", ""))
         except Exception as exc:
             return WorkflowResult.error("compare", workflow_error_message(exc))
+
+    async def get_recommendation(
+        self,
+        signals: str,
+        old_memory: str,
+    ) -> WorkflowResult[dict[str, str]]:
+        """提炼用户记忆并生成个性化推荐。
+
+        返回 {"memory": 更新后的记忆文档, "recommendation": 推荐文本}。
+        记忆文档的持久化由调用方负责。
+        """
+        try:
+            from src.agents.recommend import RecommendAgent
+
+            agent = RecommendAgent()
+            result = await agent.run({"signals": signals, "old_memory": old_memory})
+            return WorkflowResult.success({
+                "memory": result.get("memory", ""),
+                "recommendation": result.get("recommendation", ""),
+            })
+        except Exception as exc:
+            return WorkflowResult.error("recommend", workflow_error_message(exc))
 
 
 def parse_arxiv_link(link: str) -> str | None:

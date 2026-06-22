@@ -180,6 +180,16 @@ async def search_stream(query: str = Form(...), max_results: int = Form(15)):
             yield f"event: paper\ndata: {json.dumps(d)}\n\n"
 
         yield f"event: done\ndata: {json.dumps({'n_papers': len(papers)})}\n\n"
+        try:
+            from src.memory.sqlite_store import SQLiteStore
+
+            SQLiteStore().save_search(
+                query=query,
+                subtopics=state.subtopics,
+                paper_count=len(papers),
+            )
+        except Exception:
+            pass
         state.save()
 
     return StreamingResponse(
@@ -437,7 +447,45 @@ async def compare_papers(paper_ids: str = Form(...)):
 
 
 @app.post("/api/ask")
-async def ask_paper(paper_id: str = Form(...), question: str = Form(...)):
+async def ask_paper(
+    paper_id: str = Form(...),
+    question: str = Form(""),
+    image: UploadFile | None = File(None),
+):
+    question = (question or "").strip()
+
+    image_data_url = ""
+    image_ref = ""
+    if image is not None and image.filename:
+        ext = os.path.splitext(image.filename)[1].lower().lstrip(".")
+        if ext == "jpeg":
+            ext = "jpg"
+        if ext not in ("png", "jpg", "webp"):
+            raise HTTPException(status_code=400, detail="仅支持 png / jpg / webp 格式图片")
+        raw = await image.read()
+        if len(raw) > 8 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="图片大小不能超过 8MB")
+        if not raw:
+            raise HTTPException(status_code=400, detail="图片内容为空")
+
+        import base64
+        import time
+
+        _proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        img_dir = os.path.join(_proj, "data", "chat_images")
+        os.makedirs(img_dir, exist_ok=True)
+        clean = paper_id.replace("/", "_").replace("\\", "_").replace(":", "_")
+        fname = f"{clean}_{int(time.time() * 1000)}.{ext}"
+        with open(os.path.join(img_dir, fname), "wb") as f:
+            f.write(raw)
+
+        mime = "jpeg" if ext == "jpg" else ext
+        image_data_url = f"data:image/{mime};base64,{base64.b64encode(raw).decode()}"
+        image_ref = f"/api/chat-image/{fname}"
+
+    if not question and not image_ref:
+        raise HTTPException(status_code=400, detail="请输入问题或上传图片")
+
     paper_title = ""
     paper_abstract = ""
     for p in state.papers:
@@ -450,7 +498,10 @@ async def ask_paper(paper_id: str = Form(...), question: str = Form(...)):
         state.chat_by_paper[paper_id] = []
 
     history = state.chat_by_paper[paper_id].copy()
-    state.chat_by_paper[paper_id].append({"role": "user", "content": question})
+    user_entry = {"role": "user", "content": question}
+    if image_ref:
+        user_entry["image"] = image_ref
+    state.chat_by_paper[paper_id].append(user_entry)
 
     wf = get_workflow()
     result = await wf.ask_paper(
@@ -460,6 +511,7 @@ async def ask_paper(paper_id: str = Form(...), question: str = Form(...)):
         paper_summary=state.summaries.get(paper_id, ""),
         question=question,
         chat_history=history,
+        image_data_url=image_data_url,
     )
     answer = result.value if result.ok else (
         result.failure.message if result.failure else "回答失败"
@@ -471,6 +523,16 @@ async def ask_paper(paper_id: str = Form(...), question: str = Form(...)):
         "answer": answer,
         "history": state.chat_by_paper[paper_id],
     })
+
+
+@app.get("/api/chat-image/{name}")
+async def serve_chat_image(name: str):
+    name = os.path.basename(name)
+    _proj = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    img_path = os.path.join(_proj, "data", "chat_images", name)
+    if os.path.exists(img_path):
+        return FileResponse(img_path)
+    raise HTTPException(status_code=404, detail="图片不存在")
 
 
 @app.post("/api/add-paper")
@@ -501,6 +563,40 @@ async def reset():
     state.reset()
     state.save()
     return JSONResponse({"ok": True})
+
+
+@app.post("/api/recommend")
+async def recommend():
+    from src.memory.user_memory import UserMemory
+
+    memory_store = UserMemory()
+    signals = memory_store.collect_signals(state)
+    if not signals.strip():
+        raise HTTPException(status_code=400, detail="暂无足够的使用记录，先搜索或阅读几篇论文再来吧。")
+
+    old_memory = memory_store.read_memory()
+
+    wf = get_workflow()
+    result = await wf.get_recommendation(signals=signals, old_memory=old_memory)
+    if not result.ok:
+        msg = result.failure.message if result.failure else "推荐生成失败"
+        raise HTTPException(status_code=500, detail=msg)
+
+    new_memory = result.value.get("memory", "")
+    if new_memory.strip():
+        memory_store.write_memory(new_memory)
+
+    return JSONResponse({
+        "memory": new_memory,
+        "recommendation": result.value.get("recommendation", ""),
+    })
+
+
+@app.get("/api/memory")
+async def get_memory():
+    from src.memory.user_memory import UserMemory
+
+    return JSONResponse({"memory": UserMemory().read_memory()})
 
 
 def main():

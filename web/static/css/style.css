@@ -461,6 +461,73 @@ body {
 #chat-input:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 3px rgba(37,99,235,.08); }
 #chat-input::placeholder { color: var(--gray-400); }
 .chat-input-row .btn-send { width: 40px; height: 40px; min-width: 40px; padding: 0; border-radius: 50%; }
+.chat-input-row .btn-image {
+    width: 40px; height: 40px; min-width: 40px; padding: 0; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--gray-100); color: var(--gray-600); border: 1.5px solid var(--gray-200);
+    cursor: pointer; transition: background .15s, color .15s, border-color .15s;
+}
+.chat-input-row .btn-image:hover { background: #fff; color: var(--accent); border-color: var(--accent); }
+.chat-image-preview {
+    position: relative; display: inline-block; margin: 0 24px 8px;
+    padding: 6px; border: 1px solid var(--gray-200); border-radius: 10px; background: var(--gray-50);
+}
+.chat-image-preview img { display: block; max-height: 96px; max-width: 180px; border-radius: 6px; }
+.chat-image-remove {
+    position: absolute; top: -8px; right: -8px; width: 22px; height: 22px;
+    border: none; border-radius: 50%; background: var(--gray-900); color: #fff;
+    font-size: 16px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center;
+}
+.chat-image-remove:hover { background: #e03131; }
+.chat-msg .chat-img { display: block; max-width: 220px; max-height: 200px; border-radius: 8px; margin-bottom: 6px; }
+
+/* ── Recommend panel (search page) ── */
+.recommend-panel {
+    margin: 0 0 18px; padding: 16px 20px;
+    border: 1px solid var(--gray-200); border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent-light) 0%, #f8faff 100%);
+}
+.recommend-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.recommend-title { font-size: .95rem; font-weight: 650; color: var(--gray-700); }
+.recommend-head-actions { display: flex; align-items: center; gap: 12px; }
+.btn-link {
+    border: none; background: none; padding: 0; cursor: pointer;
+    font-size: .82rem; color: var(--accent); font-weight: 500;
+}
+.btn-link:hover { text-decoration: underline; }
+.recommend-close {
+    border: none; background: none; cursor: pointer;
+    font-size: 20px; line-height: 1; color: var(--gray-400); padding: 0 2px;
+}
+.recommend-close:hover { color: var(--gray-700); }
+.recommend-keywords { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.recommend-keywords:empty { display: none; }
+.recommend-kw {
+    padding: 4px 12px; border-radius: 16px; cursor: pointer;
+    font-size: .8rem; color: var(--accent); background: #fff;
+    border: 1px solid var(--accent); transition: background .15s, color .15s;
+}
+.recommend-kw:hover { background: var(--accent); color: #fff; }
+.recommend-body {
+    font-size: .86rem; line-height: 1.75; color: var(--gray-700);
+    background: #fff; border: 1px solid var(--gray-200); border-radius: 8px; padding: 12px 16px;
+}
+.recommend-body h2 { font-size: .92rem; margin: 14px 0 6px; font-weight: 650; color: var(--gray-700); }
+.recommend-body h2:first-child { margin-top: 0; }
+.recommend-body ul, .recommend-body ol { margin: 4px 0 8px; padding-left: 20px; }
+.recommend-memory {
+    font-size: .82rem; line-height: 1.7; color: var(--gray-700);
+    background: #fff; border: 1px dashed var(--gray-300); border-radius: 8px;
+    padding: 12px 16px; margin-bottom: 12px;
+    max-height: 320px; overflow-y: auto;
+}
+.recommend-memory h1 { font-size: .95rem; margin: 0 0 10px; font-weight: 700; color: var(--gray-900); }
+.recommend-memory h2 { font-size: .86rem; margin: 12px 0 5px; font-weight: 650; color: var(--accent); }
+.recommend-memory h2:first-of-type { margin-top: 0; }
+.recommend-memory ul, .recommend-memory ol { margin: 4px 0 8px; padding-left: 20px; }
+.recommend-memory li { margin-bottom: 3px; }
+.recommend-memory p { margin: 0 0 8px; }
+.recommend-memory p:last-child { margin-bottom: 0; }
 
 /* ── Notes panel (right column) ── */
 .detail-notes {

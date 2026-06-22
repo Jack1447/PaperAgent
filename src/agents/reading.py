@@ -33,12 +33,16 @@ class ReadingAgent(BaseAgent):
         chat_history = state.get("chat_history", [])
         paper_abstract = state.get("paper_abstract", "")
         paper_summary = state.get("paper_summary", "")
+        image_data_url = state.get("image_data_url", "")
 
         if not arxiv_id:
             return {"answer": "请先选择一篇论文。"}
 
-        if not question:
+        if not question and not image_data_url:
             return {"answer": "请输入你的问题。"}
+
+        if not question:
+            question = "请描述并解释这张图片。"
 
         # 1. 获取论文元数据
         paper_info = self.corpus.get_paper_metadata(arxiv_id)
@@ -99,8 +103,18 @@ class ReadingAgent(BaseAgent):
 
         system_prompt = get_prompt_by_name("reading.system")
 
-        # 5. 调用 LLM
-        answer = await self.invoke_llm(context_prompt, system=system_prompt)
+        # 5. 调用 LLM —— 若用户上传了图片，组装多模态消息
+        if image_data_url:
+            content = [
+                {"type": "text", "text": context_prompt},
+                {"type": "image_url", "image_url": {"url": image_data_url}},
+            ]
+            answer = await self.llm.chat(
+                messages=[{"role": "user", "content": content}],
+                system=system_prompt,
+            )
+        else:
+            answer = await self.invoke_llm(context_prompt, system=system_prompt)
 
         return {"answer": answer}
 

@@ -6,6 +6,17 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 
 [中文文档](README.md)
 
+## Changelog
+
+### v3
+
+- **Multimodal Q&A**: Paper chat now supports uploading local images (png/jpg/webp, ≤8MB). Images are sent to the vision model together with the paper retrieval context, enabling the model to interpret figures/screenshots in light of the paper content. Images are lightly persisted and sent only on the turn they are uploaded, keeping token cost low.
+- **Personalized Recommendation**: Added RecommendAgent and a user memory document (`data/memory.md`). The system distills a continuously-updated research-interest profile from search history, read papers, and chat questions, then suggests research directions, search keywords, and reading next-steps. It is generated automatically when entering a new search view, and keywords can launch a search with one click.
+
+### v2
+
+- **Vector search upgrade**: Per-paper chunk retrieval was upgraded from TF-IDF keyword matching to **FAISS dense semantic search**. Each paper has its own index (`IndexFlatIP` + vector normalization = cosine); embeddings are computed via LiteLLM (default `bge-m3`, configurable in `.env`), capturing synonymous/paraphrased expressions. Falls back to summary/abstract context when embeddings are unavailable, so Q&A never breaks.
+
 ## Demo
 
 ![paperagent-ezgif](asset/paperagent_gif.gif)
@@ -17,7 +28,8 @@ Multi-Agent Paper Retrieval & Reading Workbench — search, filter, and read aca
 - **Deep Reading**: Auto-download & parse PDFs, generate structured summaries (background, method, innovations, results, etc.)
 - **Paper Review**: LLM-based multi-dimensional review (topic, methodology, experiments, writing, etc.)
 - **Multi-Paper Comparison**: Select multiple summarized papers and generate a side-by-side comparison table and synthesis with one click (resizable compare panel, per-session comparison history)
-- **Q&A Interaction**: Free-form questions on individual papers with citation-traceable answers based on full-text retrieval
+- **Q&A Interaction**: Free-form questions on individual papers with citation-traceable answers based on full-text retrieval; supports uploading local images for multimodal Q&A
+- **Personalized Recommendation**: Distills a user research-interest profile (`data/memory.md`) from search history, read papers, and chat questions, then automatically suggests research directions, search keywords, and reading next-steps
 - **Streaming Results**: Papers stream one by one in real time via SSE, cards appear sequentially
 
 ## Tech Stack
@@ -96,9 +108,10 @@ Open `http://127.0.0.1:8000` in your browser.
 2. The system automatically decomposes the topic and retrieves papers — paper cards appear in real time
 3. Select papers of interest, click "Generate Summary" for structured summaries
 4. Click "Review" for LLM-based multi-dimensional evaluation
-5. Ask free-form questions in the paper dialog for deep reading
+5. Ask free-form questions in the paper dialog for deep reading (images can be uploaded for multimodal Q&A)
 6. Click "Compare" to open the compare panel and run a side-by-side comparison of multiple summarized papers
-7. Support notes and translation
+7. When entering a new search view (via "New Search"), a personalized recommendation is generated automatically from your usage history
+8. Support notes and translation
 
 ## Project Structure
 
@@ -116,9 +129,10 @@ PaperAgent/
 │   │   ├── planner.py     # Research topic decomposition
 │   │   ├── search.py      # Paper retrieval orchestration
 │   │   ├── summarize.py   # Paper summarization
-│   │   ├── reading.py     # Paper Q&A
+│   │   ├── reading.py     # Paper Q&A (with multimodal image support)
 │   │   ├── review.py      # Paper review
 │   │   ├── compare.py     # Multi-paper comparison
+│   │   ├── recommend.py   # User memory distillation & personalized recommendation
 │   │   └── reflection.py  # Retrieval quality reflection
 │   ├── retrieval/         # Retrieval core
 │   │   └── literature_retrieval.py  # Scholar search, arXiv reverse lookup, dedup, scoring
@@ -128,7 +142,7 @@ PaperAgent/
 │   │   └── pdf_parser.py     # PDF parser
 │   ├── workflows/
 │   │   └── research.py    # ResearchWorkflow facade
-│   ├── memory/            # FAISS vector search / SQLite storage
+│   ├── memory/            # FAISS vector search / SQLite storage / user memory doc
 │   ├── corpus/            # Paper corpus management
 │   ├── llm/               # LLM invocation wrapper
 │   ├── domain/            # Domain models
