@@ -19,7 +19,7 @@
 
 ## Demo
 
-![paperagent-ezgif](asset/paperagent_gif.gif)
+![paperagent-ezgif](asset/demo.gif)
 
 ## 功能
 
