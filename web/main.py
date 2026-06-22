@@ -414,20 +414,36 @@ async def review_paper(paper_id: str = Form(...)):
 
 
 @app.post("/api/compare")
-async def compare_papers(paper_ids: str = Form(...)):
+async def compare_papers(paper_ids: str = Form(...), papers: str = Form("")):
     ids = [pid.strip() for pid in paper_ids.split(",") if pid.strip()]
     if len(ids) < 2:
         raise HTTPException(status_code=400, detail="请至少选择两篇论文进行对比分析。")
+
+    # 前端传入的摘要（{uid: {title, summary}}），用于规避后端 state.summaries 失同步
+    provided: dict[str, dict] = {}
+    if papers:
+        try:
+            for item in json.loads(papers):
+                uid = str(item.get("uid", ""))
+                if uid:
+                    provided[uid] = {
+                        "title": item.get("title", ""),
+                        "summary": item.get("summary", ""),
+                    }
+        except Exception:
+            provided = {}
 
     title_by_uid = {paper_uid(p): getattr(p, "title", "") for p in state.papers}
 
     papers_to_compare = []
     for pid in ids:
-        summary = state.summaries.get(pid, "")
+        info = provided.get(pid, {})
+        summary = info.get("summary") or state.summaries.get(pid, "")
         if not summary:
             continue
+        title = info.get("title") or title_by_uid.get(pid) or pid
         papers_to_compare.append({
-            "title": title_by_uid.get(pid, pid),
+            "title": title,
             "summary": summary,
         })
 

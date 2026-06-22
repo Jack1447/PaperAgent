@@ -8,6 +8,7 @@
     let paperMap = {};
     let currentPaperId = null;
     let summaryCache = {};
+    let summaryRawCache = {};   // uid → 原始 markdown 摘要（传给后端对比，避免与 state.summaries 失同步）
     let reviewCache = {};
     let chatCache = {};
     let currentPanel = "summary";
@@ -38,6 +39,7 @@
             papers: papers,          // already plain dicts from SSE
             subtopics: subtopics,
             summaryCache: summaryCache,
+            summaryRawCache: summaryRawCache,
             reviewCache: reviewCache,
             chatCache: chatCache,
         };
@@ -51,6 +53,7 @@
         papers = snap.papers || [];
         subtopics = snap.subtopics || [];
         summaryCache = snap.summaryCache || {};
+        summaryRawCache = snap.summaryRawCache || {};
         reviewCache = snap.reviewCache || {};
         chatCache = snap.chatCache || {};
         paperMap = {};
@@ -173,7 +176,7 @@
         const maxResults = Math.max(1, Math.min(20, parseInt(mr.value, 10) || 15));
 
         papers = []; subtopics = []; paperMap = {};
-        summaryCache = {}; reviewCache = {}; chatCache = {};
+        summaryCache = {}; summaryRawCache = {}; reviewCache = {}; chatCache = {};
         pl.innerHTML = ""; sc.innerHTML = "";
         es.style.display = "none"; st.style.display = "none";
         _currentQuery = query;
@@ -310,7 +313,7 @@
     async function doReset() {
         try { await apiPost("/api/reset", {}); } catch (_) {}
         si.value = ""; papers = []; subtopics = []; paperMap = {};
-        summaryCache = {}; reviewCache = {}; chatCache = {};
+        summaryCache = {}; summaryRawCache = {}; reviewCache = {}; chatCache = {};
         pl.innerHTML = ""; sc.innerHTML = ""; es.style.display = "block"; st.style.display = "none";
     }
 
@@ -556,6 +559,7 @@
         try {
             const data = await apiPost("/api/summarize-one", { paper_id: uid });
             summaryCache[uid] = md(data.summary || "");
+            summaryRawCache[uid] = data.summary || "";
             hasPdf = !!data.has_pdf;
         } catch (_) {
             // API failed but PDF may have been downloaded; check next request
@@ -722,6 +726,7 @@
             const data = await r.json();
             if (!r.ok) { ust.textContent = data.error || "上传失败"; return; }
             summaryCache[currentPaperId] = md(data.summary || "");
+            summaryRawCache[currentPaperId] = data.summary || "";
             panelSummary.innerHTML = summaryCache[currentPaperId];
             reviewCache[currentPaperId] = null;
             if (paperMap[currentPaperId]) paperMap[currentPaperId].has_pdf = true;
@@ -831,7 +836,7 @@
     // New search button
     function newSearch() {
         papers = []; subtopics = []; paperMap = {};
-        summaryCache = {}; reviewCache = {}; chatCache = {};
+        summaryCache = {}; summaryRawCache = {}; reviewCache = {}; chatCache = {};
         rebuildPaperList();
         st.style.display = "none";
         sc.innerHTML = "";
@@ -990,7 +995,15 @@
         cmpRun.disabled = true;
         cmpResult.innerHTML = '<div class="compare-result-loading"><div class="spinner"></div>正在对比分析...</div>';
         try {
-            const data = await apiPost("/api/compare", { paper_ids: ids.join(",") });
+            const payloadPapers = ids.map(u => ({
+                uid: u,
+                title: (paperMap[u] && paperMap[u].title) || u,
+                summary: summaryRawCache[u] || summaryCache[u] || "",
+            }));
+            const data = await apiPost("/api/compare", {
+                paper_ids: ids.join(","),
+                papers: JSON.stringify(payloadPapers),
+            });
             const html = md(data.comparison || "");
             cmpResult.innerHTML = html;
             // save to session history
@@ -1071,6 +1084,7 @@
                     paperMap[p.uid] = p;
                     if (p.has_summary && p.summary) {
                         summaryCache[p.uid] = md(p.summary);
+                        summaryRawCache[p.uid] = p.summary;
                     }
                     if (p.has_review && p.review) {
                         reviewCache[p.uid] = md(p.review);
